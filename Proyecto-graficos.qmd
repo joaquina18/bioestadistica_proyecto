@@ -1,0 +1,177 @@
+---
+title: "Proyecto Bioestadística"
+format: html
+editor: visual
+---
+
+## Dataframe
+
+```{r}
+#install.packages("dplyr")
+library(dplyr)
+#install.packages("tydr")
+library(tidyr)
+#install.packages("ggplot2")
+library(ggplot2)
+#install.packages("viridis")
+library(viridis)
+#install.packages("scales")
+library(scales)
+library(gt)
+library(janitor)
+library(readxl) 
+library(gtsummary)
+```
+
+Lectura del dataframe
+
+```{r}
+getwd()
+setwd("C:/Users/User/Documents/Ciclo 9/Bioestadística/Proyecto")
+Data_1 <- read.csv("Datos.csv")
+```
+
+```{r}
+View(Data_1)
+
+```
+
+```{r}
+# Filtrar solo los casos de MALARIA POR P. VIVAX
+Data_vivax <- subset(Data_1, enfermedad == "MALARIA POR P. VIVAX")
+
+View(Data_vivax)
+```
+
+```{r}
+#agregar clasificacion de año
+malaria_vivax <- Data_vivax %>%
+  mutate(grupo_edad = case_when(
+    edad < 20 ~ "0–19 años",
+    edad >= 20 & edad < 60 ~ "20–59 años",
+    edad >= 60 ~ "60+ años"
+  ))
+
+```
+
+```{r}
+tabla_resumen <- malaria_vivax %>%
+  group_by(departamento) %>%
+  summarise(
+    total_casos = n(),
+    hombres = sum(sexo == "M", na.rm = TRUE),
+    mujeres = sum(sexo == "F", na.rm = TRUE),
+    edad_0_19 = sum(grupo_edad == "0–19 años", na.rm = TRUE),
+    edad_20_59 = sum(grupo_edad == "20–59 años", na.rm = TRUE),
+    edad_60_mas = sum(grupo_edad == "60+ años", na.rm = TRUE)
+  )
+View(tabla_resumen)
+```
+
+View(tabla_resumen)
+
+```{r}
+library(gt)
+
+tabla_resumen %>%
+  gt() %>%
+  tab_header(
+    title = md("**Tabla 1. Casos de malaria por *P. vivax* por departamento, sexo y grupo etario**")
+  ) %>%
+  fmt_number(columns = 2:7, sep_mark = ",", decimals = 0) %>%
+  cols_label(
+    departamento = "Departamento",
+    total_casos = "Total casos",
+    hombres = "Hombres",
+    mujeres = "Mujeres",
+    edad_0_19 = "0–19 años",
+    edad_20_59 = "20–59 años",
+    edad_60_mas = "60+ años"
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    column_labels.font.weight = "bold"
+  )
+View(tabla_resumen)
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+malaria_vivax <- malaria_vivax %>%
+  mutate(grupo_edad = case_when(
+    edad < 20 ~ "0–19 años",
+    edad >= 20 & edad < 60 ~ "20–59 años",
+    edad >= 60 ~ "60+ años"
+  ))
+tabla_gt <- malaria_vivax %>%
+  select(departamento, sexo, grupo_edad) %>%
+  tbl_summary(
+    by = departamento,  # agrupar por departamento
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    digits = all_categorical() ~ c(0, 1),
+    missing = "no"
+  ) %>%
+  modify_header(label = "**Variable**") %>%
+  modify_caption("**Tabla 1. Distribución de casos de malaria por departamento, sexo y grupo etario**") %>%
+  bold_labels()
+tabla_gt %>% as_gt()
+
+```
+
+`{ggplot(heat_data, aes(x = sem_epid, y = reorder(departamento, desc(departamento)), fill = casos)) +}   geom_tile(color = NA) +   scale_fill_gradientn(colours = c("white", "yellow", "orange", "red", "darkred"),                        values = rescale(c(0, 10, 30, 60, 80)),                         limits = c(0, NA),                        name = "Casos") +   labs(x = "Semana Epidemiológica", y = "Regiones",         title = "Mapa de Calor de Casos de Malaria por Semana y Región") +   theme_minimal(base_size = 12) +   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 8),         axis.text.y = element_text(size = 10),         panel.grid = element_blank())`
+
+```{r}
+# Cambiar formato de la semana a algo más agrupado por año
+heat_data <- heat_data %>%
+  mutate(sem_epid = as.Date(paste(ano, semana, 1, sep = "-"), format = "%Y-%U-%u")) # lunes de cada semana
+
+# Graficar con breaks mensuales
+ggplot(heat_data, aes(x = sem_epid, y = reorder(departamento, desc(departamento)), fill = casos)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "yellow", "orange", "red", "darkred"),
+                       values = scales::rescale(c(0, 100, 500, 1000, 2000)),
+                       name = "Casos") +
+  scale_x_date(date_breaks = "2 months", date_labels = "%Y-%b") +
+  labs(title = "Mapa de Calor de Casos de Malaria por Semana y Región",
+       x = "Semana Epidemiológica", y = "Regiones") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8),
+        axis.text.y = element_text(size = 10),
+        panel.grid = element_blank())
+
+```
+
+```{r}
+heat_data <- heat_data %>%
+  mutate(sem_id = paste0(ano, "-W", sprintf("%02d", semana)))
+
+# Mantener orden temporal
+heat_data$sem_id <- factor(heat_data$sem_id, levels = unique(heat_data$sem_id))
+
+# Añadir breaks cada ~10 semanas o donde cambia de año
+breaks_seleccionados <- levels(heat_data$sem_id)[seq(1, length(levels(heat_data$sem_id)), by = 10)]
+
+ggplot(heat_data, aes(x = sem_id, y = reorder(departamento, desc(departamento)), fill = casos)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("cornsilk", "yellow", "orange", "red", "darkred"),
+                       values = scales::rescale(c(0, 100, 500, 1000, 2000)),
+                       name = "Casos") +
+  scale_x_discrete(breaks = breaks_seleccionados) +
+  labs(title = "Mapa de Calor de Casos de Malaria por Semana y Región",
+       x = "Semana Epidemiológica", y = "Regiones") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 10),
+        panel.grid = element_blank())
+
+```
+
+```{r}
+#CAMBIAR DATOS
+
+```

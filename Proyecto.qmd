@@ -1,0 +1,75 @@
+---
+title: "Proyecto Bioestadística"
+format: html
+editor: visual
+---
+
+## Dataframe
+
+```{r}
+install.packages("dplyr")
+library(dplyr)
+install.packages("tydr")
+library(tidyr)
+library(gt)
+library(janitor)
+library(readxl) 
+library(gtsummary)
+```
+
+Lectura del dataframe
+
+```{r}
+getwd()
+setwd("C:/Users/User/Documents/Ciclo 9/Bioestadística/Proyecto")
+Data_1 <- read.csv("Datos.csv")
+```
+
+```{r}
+df_malaria <- Data_1
+```
+
+```{r}
+#agregar categoría por periodo
+df_malaria <- df_malaria %>%
+  mutate(periodo = case_when(
+    ano <= 2019 ~ "Pre-COVID",
+    ano %in% c(2020, 2021) ~ "COVID",
+    ano >= 2022 ~ "Post-COVID"
+  ))
+
+
+```
+
+```{r}
+
+df_malaria <- df_malaria %>%
+  mutate(
+    sexo = factor(sexo, levels = c("M", "F"), labels = c("Masculino", "Femenino")),
+    tipo_parasito = case_when(
+      grepl("VIVAX", enfermedad) ~ "P. vivax",
+      grepl("FALCIPARUM", enfermedad) ~ "P. falciparum",
+      TRUE ~ "Otro"
+    ),
+    grupo_edad = cut(edad, breaks = c(0, 14, 29, 44, 59, Inf), 
+                     labels = c("<15", "15–29", "30–44", "45–59", "≥60"))
+  )
+```
+
+```{r}
+
+# Tabla resumen
+tabla_resumen <- df_malaria %>%
+  select(periodo, sexo, grupo_edad, tipo_parasito) %>%
+  tbl_summary(by = periodo, 
+              statistic = list(all_categorical() ~ "{n} ({p}%)"),
+              missing = "no") %>%
+  add_p() %>%
+  modify_header(label = "**Variable**") %>%
+  bold_labels()
+
+```
+
+```{r}
+View(DF)
+```
